@@ -1,0 +1,21 @@
+{
+  "branch": "ci/release-assets",
+  "sleepSeconds": 20,
+  "debugLog": false,
+  "releases": [
+    {
+      "tag": "v1.0.0",
+      "title": "v1.0.0 — 首个版本",
+      "notes": "release-notes/v1.0.0.md",
+      "assets": "release-assets/v1.0.0/*",
+      "latest": false
+    },
+    {
+      "tag": "v1.1.0",
+      "title": "v1.1.0 — 最新版本",
+      "notes": "release-notes/v1.1.0.md",
+      "assets": "release-assets/v1.1.0/*",
+      "latest": true
+    }
+  ]
+}

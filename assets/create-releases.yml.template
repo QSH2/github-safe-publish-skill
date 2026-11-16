@@ -1,0 +1,38 @@
+# 临时发版工作流模板（由 scripts/make-release-workflow.ps1 生成同构 YAML）
+# 用法：复制到 .github/workflows/create-releases.yml，按需增删 release 块。
+# 前提：
+#   1) tag 已存在；
+#   2) release-assets/<tag>/ 与 release-notes/<tag>.md 已提交到触发分支；
+#   3) 分支名与 on.push.branches 一致。
+name: create-releases
+on:
+  push:
+    branches:
+      - ci/release-assets
+
+permissions:
+  contents: write
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create or update releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh --version
+          if gh release view "v1.0.0" >/dev/null 2>&1; then
+            gh release upload "v1.0.0" release-assets/v1.0.0/* --clobber
+          else
+            gh release create "v1.0.0" --verify-tag --title "v1.0.0 — 首个版本" --notes-file "release-notes/v1.0.0.md" --latest=false release-assets/v1.0.0/*
+          fi
+          sleep 20
+          if gh release view "v1.1.0" >/dev/null 2>&1; then
+            gh release upload "v1.1.0" release-assets/v1.1.0/* --clobber
+          else
+            gh release create "v1.1.0" --verify-tag --title "v1.1.0 — 最新版本" --notes-file "release-notes/v1.1.0.md" release-assets/v1.1.0/*
+          fi

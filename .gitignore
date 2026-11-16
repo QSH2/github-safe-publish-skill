@@ -1,0 +1,21 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# logs & temp
+*.log
+temp/
+tmp/
+*.tmp
+
+# secrets
+.env
+.env.*
+*.pem
+*.key
+id_rsa
+id_ed25519
+*.pfx
