@@ -26,13 +26,14 @@ author: 清水Shimizu-github@QSH2 与她的 deepseek
 | 目标 | SSH 能做 | 不能做 |
 | --- | --- | --- |
 | 推送提交 / 分支 / tag | ✅ `git push` | — |
+| **创建新仓库** | ❌ | 需要 **网页 / REST API / gh CLI device flow**（见 08） |
 | 创建/更新 Release | ❌ | 需要 **网页 / REST API / GitHub Actions 内的 GITHUB_TOKEN** |
 | 上传 Release 资产 | ❌ | 同上 |
-| 修改仓库 Topics / 描述 | ❌ | 网页或 API（需要对应权限） |
+| 修改仓库 Topics / 描述 | ❌ | 网页、`gh repo edit` 或 API |
 | 验证远端内容 | ✅ 克隆、`ls-remote`、tree 对比 | Release 资产需 HTTP HEAD/下载校验 |
 
-> 关键认知：**SSH key 只认证 git 协议，不能调用 REST API**。需要发 Release 时不要找
-> 「怎么用 SSH 发版」，直接走 `references/04-release-without-token.md`。
+> 关键认知：**SSH key 只认证 git 协议，不能调用 REST API，也不能创建仓库**。
+> 建仓走 `references/08`，发 Release 走 `references/04`，不要在这两件事上找 SSH 的办法。
 
 ---
 
@@ -44,17 +45,17 @@ author: 清水Shimizu-github@QSH2 与她的 deepseek
 | 02 | [`references/02-git-push-safety.md`](references/02-git-push-safety.md) | 推送前备份 bundle、先 main 后 tags、`--force-with-lease`、备份旧远端为分支、作者/历史改写（commit-tree + tag 重建）、UTF-8 BOM 坑 | 要把本地历史推上去/覆盖远端 |
 | 03 | [`references/03-repo-repair-and-rename.md`](references/03-repo-repair-and-rename.md) | 识别网页上传残缺（只有顶层文件、单 commit "Add files via upload"）、tree 对比、改名后同步 remote、force 推送、保留旧内容分支 | 远端仓库不完整或刚改名 |
 | 04 | [`references/04-release-without-token.md`](references/04-release-without-token.md) | **临时 Actions 工作流发 Release**：资产分支、`.gitignore` 吞 exe/zip 的强制 add、权限、`gh release create/upload --clobber`、幂等、节奏、把调试日志 commit 回分支、清理 | 没有 PAT、又不想网页点 6 次 |
-| 05 | [`references/05-verification.md`](references/05-verification.md) | 终极校验：独立 SSH 克隆、tree/file 数、`ls-remote`；Release 资产 HEAD 302、`expanded_assets`、`/releases/latest` 跳转、SHA256 下载核对、Actions 状态 | 每次发布后 |
+| 05 | [`references/05-verification.md`](references/05-verification.md) | 终极校验：独立 SSH 克隆、tree/file 数、`ls-remote`；Release 资产 HEAD（跟随重定向，最终 200）、`expanded_assets`、`/releases/latest` 跳转、SHA256 下载核对、Actions 状态 | 每次发布后 |
 | 06 | [`references/06-anti-suspension.md`](references/06-anti-suspension.md) | GitHub 风控/封号规律、被 suspended 的症状（API 403 原文）、申诉入口与 6 个月窗口、预防清单、token 卫生 | 新账号/批量操作前；或已被封 |
 | 07 | [`references/07-case-study-pcl-rp.md`](references/07-case-study-pcl-rp.md) | 本次完整时间线复盘：老号被封 → 新号 QSH2 → GPT 网页只传了 8 个文件 → SSH 补全 → Actions 发 6 个 Release → 校验 | 想看重现案例与真实踩坑顺序 |
-| 08 | [`references/08-token-and-device-flow.md`](references/08-token-and-device-flow.md) | 替代方案对比：fine-grained PAT、OAuth device flow（`gh auth login`）、网页手动；各自权限、风险与撤销 | Actions 方案不适用时 |
+| 08 | [`references/08-token-and-device-flow.md`](references/08-token-and-device-flow.md) | **创建仓库 + gh CLI 授权**：Windows 便携 gh、OAuth device flow（含非交互式调用）、`gh repo create`/topics、SSH 推送、logout；PAT/网页手动对比 | 要新建仓库、或 Actions 方案不适用时 |
 
 **脚本与模板**
 
 | 路径 | 用途 |
 | --- | --- |
 | [`scripts/check-ssh-github.ps1`](scripts/check-ssh-github.ps1) | 只读检查：SSH 连通性、远端 HEAD/tree 与本地是否一致、tag 列表 |
-| [`scripts/verify-release-assets.ps1`](scripts/verify-release-assets.ps1) | 按本地资产目录逐项 HEAD 校验 Release 资产（302/404）、latest 跳转、可选 SHA256 |
+| [`scripts/verify-release-assets.ps1`](scripts/verify-release-assets.ps1) | 按本地资产目录逐项 HEAD 校验 Release 资产（跟随重定向，最终 200/404）、latest 跳转、可选 SHA256 |
 | [`scripts/make-release-workflow.ps1`](scripts/make-release-workflow.ps1) | 由 JSON 清单生成临时 Actions 发版工作流（含 title/notes/assets/latest 规则） |
 | [`scripts/push-main-then-tags.ps1`](scripts/push-main-then-tags.ps1) | 安全推送：先 main、等待、再 tags；可选自动 bundle 备份与 dry-run |
 | [`assets/create-releases.yml.template`](assets/create-releases.yml.template) | Actions 工作流模板（`gh release create/upload` + 调试日志回写） |
@@ -68,6 +69,8 @@ author: 清水Shimizu-github@QSH2 与她的 deepseek
 你要做什么？
 ├─ 这台 Windows 还没配 GitHub SSH
 │   → references/01（便携 OpenSSH + ed25519 + 公钥加到 GitHub + 验证）
+├─ 要在 GitHub 上新建一个仓库
+│   → references/08（gh CLI device flow 建仓 + topics，再 SSH 推送）
 ├─ 有本地仓库要首次推到 GitHub
 │   → references/02（bundle 备份 → push main → push tags）
 ├─ 远端仓库内容残缺 / 刚改名 / 历史不对
@@ -102,6 +105,8 @@ author: 清水Shimizu-github@QSH2 与她的 deepseek
     `301` 通常只是仓库改名（旧 URL → 新 URL），不要误判为资产丢失。Release 页面/`expanded_assets`
     有缓存与懒加载，不可靠。
 12. **私钥永远不外发**；只把 `*.pub` 加到 GitHub；任何 token 不打印、不写入仓库，用完撤销。
+13. **SSH 不能创建仓库**：用 gh CLI 的 device flow（`gh auth login --web`）→ `gh repo create` →
+    `gh repo edit --add-topic` → SSH 推送；结束 `gh auth logout` 删除 token（详见 08）。
 
 ---
 
@@ -110,7 +115,7 @@ author: 清水Shimizu-github@QSH2 与她的 deepseek
 1. **新账号不要短时间批量 API 写操作**（建仓、5+ Release、上传多资产）；这是实测触发 suspended 的路径。
 2. **推送/发版分离节奏**：main → tags → 每个 Release 间隔 20–30 秒以上；能分天就分天。
 3. **优先用 GitHub 自己的 token**（Actions 的 `GITHUB_TOKEN`）完成 CI 内发版；不要为了省事让用户粘贴长期 token。
-4. **任何"上传完成"的说法都必须用机器可验证证据**（tree/HEAD/302/SHA256），不要信自然语言汇报。
+4. **任何"上传完成"的说法都必须用机器可验证证据**（tree / 跟随重定向的最终 200 / SHA256），不要信自然语言汇报。
 5. **不把官方/第三方二进制、密钥、日志提交进公开仓库**；发版资产只走 Release。
 6. **临时分支用完删除**：`git push origin --delete <tmp-branch>`，否则仓库里留下工作流和大文件。
 
@@ -130,9 +135,9 @@ git clone --quiet git@github.com:<owner>/<repo>.git "$env:TEMP\repo-check"
 git -C "$env:TEMP\repo-check" log --oneline -1
 git -C "$env:TEMP\repo-check" tag --list
 
-# 3) Release 资产（存在 = 302）
-curl.exe -s -o NUL -w "%{http_code}`n" -I "https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>"
-curl.exe -s -o NUL -w "%{redirect_url}`n" -I "https://github.com/<owner>/<repo>/releases/latest"
+# 3) Release 资产（跟随重定向，最终 200 才是存在）
+curl.exe -s -o NUL -w "%{http_code}`n" -I -L "https://github.com/<owner>/<repo>/releases/download/<tag>/<asset>"
+curl.exe -s -o NUL -w "%{url_effective}`n" -I -L "https://github.com/<owner>/<repo>/releases/latest"
 ```
 
 > 本次真实事故里，几乎每个坑都属于「工具说成功，但实际没上去」。本 skill 的核心就是

@@ -23,7 +23,7 @@ github-safe-publish-skill/
 │  ├─ 05-verification.md                 # clone / tree / HEAD 重定向 / SHA256 / latest 验证
 │  ├─ 06-anti-suspension.md              # 风控预防、suspended 症状、申诉模板
 │  ├─ 07-case-study-pcl-rp.md            # 真实事故完整时间线
-│  └─ 08-token-and-device-flow.md        # PAT / OAuth device flow / 网页手动对比
+│  └─ 08-token-and-device-flow.md        # 创建仓库 + gh CLI device flow、PAT / 网页手动对比
 ├─ scripts/
 │  ├─ check-ssh-github.ps1               # 只读：SSH、refs、tree、文件数、tags
 │  ├─ verify-release-assets.ps1          # Release 资产 HEAD 校验 + latest + SHA256
@@ -95,12 +95,42 @@ skill github-safe-publish
 
 ---
 
+## 新建仓库（SSH 做不到）
+
+SSH 只能推 git 对象，**创建仓库必须走网页 / REST API / GitHub CLI**。推荐用 gh 的 OAuth device flow：
+
+```powershell
+# 1) 安装 gh（Windows 便携版，无需管理员；详见 references/08 第 2 节）
+#    或 winget install GitHub.cli
+
+# 2) 浏览器授权（终端会显示一次性代码，打开 https://github.com/login/device 输入）
+gh auth login --hostname github.com --git-protocol ssh --web --insecure-storage
+
+# 3) 创建仓库并设置 topics
+gh repo create "<owner>/<repo>" --public --description "给 AI Agent 的 GitHub 安全发布技能包"
+gh repo edit "<owner>/<repo>" --add-topic ai-agent --add-topic github --add-topic skill
+
+# 4) 用 SSH 推送（建仓与推送互不冲突）
+git remote add origin "git@github.com:<owner>/<repo>.git"
+git push -u origin main
+
+# 5) 结束：删除本地 token
+gh auth logout --hostname github.com
+```
+
+> 本仓库自身就是这样创建的：gh device flow 建仓 + 设置 topics，再用 SSH 推送。
+> 完整细节（非交互式调用、token scopes、排错表）见 `references/08-token-and-device-flow.md`。
+
+---
+
 ## 使用决策树
 
 ```text
 你要做什么？
 ├─ 这台 Windows 还没配 GitHub SSH
 │   → references/01（便携 OpenSSH + ed25519 + 公钥加到 GitHub + 验证）
+├─ 要在 GitHub 上新建一个仓库
+│   → references/08（gh CLI device flow 建仓 + topics，再 SSH 推送）
 ├─ 有本地仓库要首次推到 GitHub
 │   → references/02（bundle 备份 → push main → push tags）
 ├─ 远端仓库内容残缺 / 刚改名 / 历史不对
@@ -185,6 +215,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\push-main-then-tags.ps1 -Repo
 | 目标 | SSH | 需要 |
 | --- | --- | --- |
 | 推送提交/分支/tag | ✅ | — |
+| **创建新仓库** | ❌ | 网页 / REST API / **gh CLI device flow**（见 references/08） |
 | 创建/更新 Release | ❌ | 网页 / REST API / GitHub Actions |
 | 上传 Release 资产 | ❌ | 同上 |
 | 修改 Topics/描述 | ❌ | 网页或 API |
